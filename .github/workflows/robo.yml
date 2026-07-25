@@ -1,0 +1,35 @@
+name: Robô das Rádios Fabão Sistemas
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  faxina_noturna:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Pegando os arquivos do repositório
+        uses: actions/checkout@v3
+
+      - name: Instalando o Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalando a biblioteca Requests
+        run: pip install requests
+
+      - name: Rodando o script Python
+        run: python gerador_radios.py
+
+      - name: Salvando os novos arquivos JSON no GitHub
+        run: |
+          git config --global user.name 'Robô Fabão Sistemas'
+          git config --global user.email 'robo@fabaosistemas.com'
+          git add *.json
+          git commit -m "Atualização automática das rádios" || echo "Sem mudanças hoje"
+          git push
