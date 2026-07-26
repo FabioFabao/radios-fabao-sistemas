@@ -12,18 +12,22 @@ def limpar_nome(texto):
 def gerar_top150_pais(sigla_pais, limite=150):
     nome_arquivo = f"{sigla_pais.lower()}_top150.json"
     lista_final = []
+    
+    # O SEGREDO CONTRA REPETIÇÕES: Guardar o que já passou pelo crivo
+    nomes_vistos = set()
+    urls_vistas = set()
 
     url = "https://de1.api.radio-browser.info/json/stations/search"
     parametros = {
         "countrycode": sigla_pais,
-        "countryexact": "true", # Trava 1: Exige país exato da API
-        "limit": 300,           # Puxa o dobro para termos margem de corte
-        "order": "votes",       # O SEGREDO: Ordena por humanos reais (mata os bots)
+        "countryexact": "true", 
+        "limit": 500,           # Puxa 500 cruas para ter mais material limpo
+        "order": "votes",       
         "reverse": "true",
         "hidebroken": "true"
     }
     
-    headers = {'User-Agent': 'FabaoSistemasRadio/5.0'}
+    headers = {'User-Agent': 'FabaoSistemasRadio/6.0'}
 
     try:
         resposta = requests.get(url, params=parametros, headers=headers, timeout=10)
@@ -32,24 +36,26 @@ def gerar_top150_pais(sigla_pais, limite=150):
             radios_brutas = resposta.json()
             
             for r in radios_brutas:
-                # Trava 2: Verificação absoluta no Python
                 if r.get('countrycode', '').upper() == sigla_pais:
                     nome_limpo = limpar_nome(r['name'])
                     url_audio = r['url_resolved']
                     
+                    # Trava 3: Guilhotina dupla (Nome único E Link único)
                     if nome_limpo and url_audio:
-                        item = {"n": nome_limpo, "u": url_audio}
-                        if item not in lista_final:
-                            lista_final.append(item)
+                        if nome_limpo not in nomes_vistos and url_audio not in urls_vistas:
                             
-                            # Para de adicionar assim que atingir os 150 cravados
+                            lista_final.append({"n": nome_limpo, "u": url_audio})
+                            nomes_vistos.add(nome_limpo)
+                            urls_vistas.add(url_audio)
+                            
+                            # Para de adicionar assim que bater a meta
                             if len(lista_final) == limite:
                                 break
 
             if lista_final:
                 with open(nome_arquivo, 'w', encoding='utf-8') as f:
                     json.dump(lista_final, f, ensure_ascii=True, separators=(',', ':'))
-                print(f"✅ {nome_arquivo} salvo com sucesso ({len(lista_final)} rádios validadas)")
+                print(f"✅ {nome_arquivo} salvo: {len(lista_final)} rádios ÚNICAS.")
             else:
                 print(f"⚠️ Nenhuma rádio validada para a sigla {sigla_pais}")
         else:
@@ -68,11 +74,11 @@ paises_50 = [
 ]
 
 if __name__ == "__main__":
-    print("Iniciando varredura Fabão Sistemas: Filtro Antispam (Votos Reais)...\n")
+    print("Iniciando varredura Fabão Sistemas: Filtro Anti-Repetição Absoluto...\n")
     
     for sigla in paises_50:
         print(f"\n--- País: {sigla} ---")
         gerar_top150_pais(sigla, limite=150)
         time.sleep(1.0)
         
-    print("\n🎉 Varredura finalizada com listas limpas!")
+    print("\n🎉 Varredura finalizada com sucesso. Zero duplicatas!")
