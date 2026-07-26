@@ -4,32 +4,35 @@ import unicodedata
 import time
 
 def limpar_nome(texto):
+    # Remove acentos
     texto = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
+    # Deixa tudo maiúsculo
     texto = texto.upper()
+    # Remove tudo que não for letra, número ou espaço
     limpo = "".join([c for c in texto if c.isalnum() or c.isspace()])
+    # Limita o tamanho para o LCD do ESP32 (ex: 20 caracteres)
     return limpo.strip()[:20]
 
-def gerar_lista(sigla_pais, genero, limite=15):
-    nome_arquivo = f"{sigla_pais.lower()}_{genero}.json"
+def gerar_top100_pais(sigla_pais, limite=100):
+    # O arquivo será salvo como br_top100.json, us_top100.json, etc.
+    nome_arquivo = f"{sigla_pais.lower()}_top100.json"
     
-    # Usando o endpoint raiz recomendado com o filtro correto por código de país
     url = "https://de1.api.radio-browser.info/json/stations/search"
     parametros = {
-        "countrycode": sigla_pais, # Sigla exata (BR, US, AR, etc.)
-        "tag": genero,
+        "countrycode": sigla_pais,
         "limit": limite,
-        "order": "votes",
+        "order": "clickcount", # O segredo: ordena pelas mais ouvidas no mundo real
         "reverse": "true",
-        "hidebroken": "true"
+        "hidebroken": "true"   # Oculta links quebrados
     }
 
-    # Cabeçalho obrigatório exigido pela documentação do Radio Browser para evitar bloqueio
+    # Cabeçalho para não ser bloqueado
     headers = {
-        'User-Agent': 'FabaoSistemasRadioRadio/1.0'
+        'User-Agent': 'FabaoSistemasRadioRadio/2.0'
     }
 
     try:
-        resposta = requests.get(url, params=parametros, headers=headers, timeout=8)
+        resposta = requests.get(url, params=parametros, headers=headers, timeout=10)
         
         if resposta.status_code == 200:
             radios_brutas = resposta.json()
@@ -38,41 +41,45 @@ def gerar_lista(sigla_pais, genero, limite=15):
             for r in radios_brutas:
                 nome_limpo = limpar_nome(r['name'])
                 url_audio = r['url_resolved']
+                
+                # Só adiciona se tiver nome e link válidos
                 if nome_limpo and url_audio:
                     lista_limpa.append({"n": nome_limpo, "u": url_audio})
 
             if lista_limpa:
                 with open(nome_arquivo, 'w', encoding='utf-8') as f:
                     json.dump(lista_limpa, f, ensure_ascii=True, separators=(',', ':'))
-                print(f"✅ {nome_arquivo} salvo ({len(lista_limpa)} rádios)")
+                print(f"✅ {nome_arquivo} salvo com sucesso ({len(lista_limpa)} rádios reais)")
             else:
-                print(f"⚠️ Vazio para {sigla_pais} - {genero}")
+                print(f"⚠️ Nenhuma rádio encontrada para a sigla {sigla_pais}")
         else:
-            print(f"❌ Erro HTTP {resposta.status_code} em {sigla_pais} - {genero}")
+            print(f"❌ Erro HTTP {resposta.status_code} no país {sigla_pais}")
             
     except Exception as e:
-        print(f"❌ Timeout/Erro em {sigla_pais} - {genero}")
+        print(f"❌ Timeout/Erro de conexão no país {sigla_pais}")
 
-# --- LISTA FOCO (Os principais países de alta demanda para o seu produto) ---
-paises_foco = [
-    "BR", "AR", "UY", "CL", "CO", "MX", "US", "CA", 
-    "GB", "FR", "DE", "IT", "ES", "PT", "JP", "KR"
-]
-
-# --- GÊNEROS ESSENCIAIS ---
-generos_foco = [
-    "pop", "rock", "jazz", "classical", "news", 
-    "electronic", "hiphop", "country", "80s", "latin"
+# --- MATRIZ DE 50 PAÍSES ESTRATÉGICOS ---
+paises_50 = [
+    # América do Sul (10)
+    "BR", "AR", "UY", "CL", "CO", "PE", "VE", "EC", "PY", "BO",
+    # América do Norte e Central (10)
+    "US", "CA", "MX", "CU", "CR", "PA", "DO", "JM", "SV", "GT",
+    # Europa (15)
+    "GB", "FR", "DE", "IT", "ES", "PT", "NL", "SE", "CH", "AT", "BE", "IE", "GR", "PL", "RU",
+    # Ásia (8)
+    "JP", "KR", "CN", "IN", "ID", "PH", "TH", "VN",
+    # Oceania e África (7)
+    "AU", "NZ", "ZA", "EG", "NG", "KE", "MA"
 ]
 
 if __name__ == "__main__":
-    print("Iniciando varredura otimizada Fabão Sistemas...\n")
+    print("Iniciando varredura Fabão Sistemas: Top 100 Global em 50 Países...\n")
     
-    for sigla in paises_foco:
+    for sigla in paises_50:
         print(f"\n--- País: {sigla} ---")
-        for genero in generos_foco:
-            gerar_lista(sigla, genero, limite=15)
-            # Pausa segura de 1 segundo para o servidor não banir o IP do GitHub
-            time.sleep(1.0)
-            
-    print("\n🎉 Varredura otimizada finalizada com sucesso!")
+        gerar_top100_pais(sigla, limite=100)
+        
+        # Pausa cirúrgica de 1 segundo para poupar o servidor
+        time.sleep(1.0)
+        
+    print("\n🎉 Varredura Top 100 Global finalizada com perfeição!")
